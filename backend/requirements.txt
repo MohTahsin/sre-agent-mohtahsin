@@ -1,0 +1,6 @@
+strands-agents
+strands-xai
+fastapi
+uvicorn[standard]
+boto3
+python-dotenv
