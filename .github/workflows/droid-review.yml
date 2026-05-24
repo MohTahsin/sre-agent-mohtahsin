@@ -1,0 +1,57 @@
+name: Factory Droid Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  droid-review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Droid CLI
+        run: |
+          curl -fsSL https://app.factory.ai/cli | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run Factory Droid review
+        env:
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          droid exec --auto low "
+          You are performing an automated code review on pull request #${PR_NUMBER}
+          for the grok-sre-agent repository.
+
+          Configuration:
+            review_depth: deep
+            automatic_review: true
+            include_suggestions: true
+            auto_approve_clean_prs: true
+
+          Tasks:
+          1. Fetch the diff between base ${PR_BASE_SHA} and head ${PR_HEAD_SHA}.
+          2. Identify bugs, correctness issues, async mistakes, null dereferences,
+             broken control flow, missing error handling, resource leaks, race
+             conditions, and security problems.
+          3. Pay special attention to SRE remediation logic in
+             backend/remediation/ — recommendations must be integers, must enforce
+             a minimum safety floor, and must never recommend below current load.
+          4. Post inline review comments via the GitHub API for each issue,
+             grouped per file with concrete fix suggestions.
+          5. If no actionable issues are found, approve the PR with a short
+             summary comment.
+          "

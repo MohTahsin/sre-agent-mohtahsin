@@ -1,0 +1,87 @@
+name: Factory Fix Bug
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  fix-bug:
+    if: contains(github.event.pull_request.labels.*.name, 'factory-fix')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Capture failing tests
+        id: failing
+        continue-on-error: true
+        run: pytest -q | tee pytest-output.txt
+
+      - name: Set up Droid CLI
+        run: |
+          curl -fsSL https://app.factory.ai/cli | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run Factory Droid fix
+        env:
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+        run: |
+          droid exec --auto low "
+          You are working on the Grok SRE Agent project.
+
+          A pull request has failing tests and may contain an SRE remediation bug.
+          The captured pytest output is available at pytest-output.txt.
+
+          Your task:
+          1. Inspect the failing tests in tests/ and the relevant source files
+             under backend/remediation/.
+          2. Identify the root cause of the failures.
+          3. Fix the production code so the tests pass.
+          4. Add or update tests in tests/ if a test gap is exposed during the fix.
+          5. Do not change unrelated files.
+          6. Do not commit or push changes — the workflow handles git operations.
+
+          Focus on correctness, safe remediation logic, and clear test coverage.
+          The remediation contract:
+            - calculate_reserved_concurrency must return an int
+            - it must never return below the documented minimum floor
+            - it must apply the documented safety buffer over observed RPS
+          "
+
+      - name: Commit Factory fix
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "factory-droid[bot]"
+            git config user.email "138933559+factory-droid[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "fix: correct SRE remediation logic
+
+          Automated fix applied by Factory Droid in response to the
+          factory-fix label on this PR.
+
+          Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          else
+            echo "No changes made by Droid"
+          fi
