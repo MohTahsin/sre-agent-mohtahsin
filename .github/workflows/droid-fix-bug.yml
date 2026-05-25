@@ -47,7 +47,7 @@ jobs:
         env:
           FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
         run: |
-          droid exec --auto low "
+          droid exec --auto medium "
           You are working on the Grok SRE Agent project.
 
           A pull request has failing tests and may contain an SRE remediation bug.

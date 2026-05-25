@@ -35,7 +35,7 @@ jobs:
         env:
           FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
         run: |
-          droid exec --auto low "
+          droid exec --auto medium "
           The following source files were just merged to main:
           $(cat changed_files.txt)
 
