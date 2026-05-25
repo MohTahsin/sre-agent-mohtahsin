@@ -33,20 +33,49 @@ function Write-Step($msg) { Write-Host "[reset] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "[reset] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "[reset] $msg" -ForegroundColor Yellow }
 
+# Wraps git so PowerShell 5.1 does not raise NativeCommandError when git writes
+# informational messages (e.g. "[deleted] foo") to stderr. Throws on non-zero exit.
+function Invoke-Git {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $GitArgs)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $output = & git @GitArgs 2>&1
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) {
+        throw "git $($GitArgs -join ' ') failed (exit $code):`n$output"
+    }
+    return $output
+}
+
+# Same as Invoke-Git but never throws; returns the exit code so the caller can
+# treat "not found" / "already absent" cases as no-ops.
+function Invoke-GitQuiet {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $GitArgs)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & git @GitArgs 2>&1 | Out-Null
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    return $code
+}
+
 if (-not (Test-Path (Join-Path $RepoRoot ".git"))) {
     throw "Not a git repository: $RepoRoot"
 }
 
-$dirty = git status --porcelain
+$dirty = Invoke-Git status --porcelain
 if ($dirty) {
     throw "Working tree is not clean. Commit or stash changes before resetting:`n$dirty"
 }
 
-git fetch --tags --prune $Remote | Out-Null
+Invoke-Git fetch --tags --prune $Remote | Out-Null
 
 foreach ($tag in @($BaselineMain, $BaselineBuggy)) {
-    git rev-parse --verify "refs/tags/$tag" 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    $code = Invoke-GitQuiet rev-parse --verify "refs/tags/$tag"
+    if ($code -ne 0) {
         throw "Required tag '$tag' not found locally. Run 'git fetch --tags' or recreate the baseline."
     }
 }
@@ -55,16 +84,24 @@ Write-Step "Closing open demo PRs (if any)..."
 $ghAvailable = (Get-Command gh -ErrorAction SilentlyContinue) -ne $null
 if ($ghAvailable) {
     $heads = @($FeatBranch)
-    $heads += (git ls-remote --heads $Remote 'docs/factory-update-*' |
-        ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/heads/','' })
+    $remoteDocsRefs = Invoke-Git ls-remote --heads $Remote 'docs/factory-update-*'
+    if ($remoteDocsRefs) {
+        $heads += ($remoteDocsRefs | ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/heads/','' })
+    }
 
     foreach ($head in $heads) {
         if (-not $head) { continue }
-        $prs = gh pr list --head $head --state open --json number --jq '.[].number' 2>$null
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $prs = gh pr list --head $head --state open --json number --jq '.[].number' 2>&1
+        $ErrorActionPreference = $prev
         foreach ($n in $prs) {
-            if ($n) {
+            if ($n -match '^\d+$') {
                 Write-Step "  closing PR #$n (head: $head)"
-                gh pr close $n --delete-branch=false 2>$null | Out-Null
+                $prev = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                gh pr close $n --delete-branch=false 2>&1 | Out-Null
+                $ErrorActionPreference = $prev
             }
         }
     }
@@ -73,29 +110,35 @@ if ($ghAvailable) {
 }
 
 Write-Step "Deleting remote demo branches..."
-git push $Remote --delete $FeatBranch 2>$null | Out-Null
-$docsBranches = git ls-remote --heads $Remote 'docs/factory-update-*' |
-    ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/heads/','' }
-foreach ($b in $docsBranches) {
-    if ($b) {
-        Write-Step "  deleting $Remote/$b"
-        git push $Remote --delete $b 2>$null | Out-Null
+[void](Invoke-GitQuiet push $Remote --delete $FeatBranch)
+
+$remoteDocsRefs = Invoke-Git ls-remote --heads $Remote 'docs/factory-update-*'
+if ($remoteDocsRefs) {
+    $docsBranches = $remoteDocsRefs | ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/heads/','' }
+    foreach ($b in $docsBranches) {
+        if ($b) {
+            Write-Step "  deleting $Remote/$b"
+            [void](Invoke-GitQuiet push $Remote --delete $b)
+        }
     }
 }
 
 Write-Step "Resetting local main to $BaselineMain and force-pushing..."
-git checkout main | Out-Null
-git reset --hard "refs/tags/$BaselineMain"
-git push --force-with-lease $Remote main
+Invoke-Git checkout main | Out-Null
+Invoke-Git reset --hard "refs/tags/$BaselineMain" | Out-Null
+Invoke-Git push --force-with-lease $Remote main | Out-Null
 
 Write-Step "Recreating local $FeatBranch from $BaselineBuggy..."
-git branch -D $FeatBranch 2>$null | Out-Null
-git branch $FeatBranch "refs/tags/$BaselineBuggy"
+[void](Invoke-GitQuiet branch -D $FeatBranch)
+Invoke-Git branch $FeatBranch "refs/tags/$BaselineBuggy" | Out-Null
+
+$mainSha = (Invoke-Git rev-parse --short main).ToString().Trim()
+$featSha = (Invoke-Git rev-parse --short $FeatBranch).ToString().Trim()
 
 Write-Ok ""
 Write-Ok "Demo reset complete."
-Write-Ok "  main          -> $(git rev-parse --short main)"
-Write-Ok "  $FeatBranch  -> $(git rev-parse --short $FeatBranch)"
+Write-Ok "  main          -> $mainSha"
+Write-Ok "  $FeatBranch  -> $featSha"
 Write-Ok ""
 Write-Ok "Next demo run:"
 Write-Ok "  git push -u origin $FeatBranch"
