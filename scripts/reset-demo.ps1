@@ -8,7 +8,12 @@
       2. Deletes the remote feat/lambda-scaling-recommendation branch.
       3. Deletes any remote docs/factory-update-* branches created by the docs workflow.
       4. Hard-resets local main to the demo-baseline-main tag and force-pushes.
-      5. Recreates the local feat/lambda-scaling-recommendation branch from demo-baseline-buggy.
+      5. Rebuilds local feat/lambda-scaling-recommendation on top of main with a
+         FRESH-SHA buggy commit replayed from
+         scripts/.demo-buggy-lambda-scaling.py.txt, then force-moves the
+         demo-baseline-buggy tag to the new commit. This is what keeps the
+         feat branch ahead of main on every cycle so GitHub will let you open
+         a PR in step 2 of DEMO.md.
 
     Does NOT push the buggy feat branch. You push it live during the next demo
     as step 1 of the kickoff so the "watch CI fail" moment stays real.
@@ -28,6 +33,9 @@ $BaselineMain = "demo-baseline-main"
 $BaselineBuggy = "demo-baseline-buggy"
 $FeatBranch = "feat/lambda-scaling-recommendation"
 $Remote = "origin"
+$BuggyTemplate = "scripts/.demo-buggy-lambda-scaling.py.txt"
+$BuggyTarget = "backend/remediation/lambda_scaling.py"
+$BuggyCommitMsg = "feat: add reserved concurrency recommendation"
 
 function Write-Step($msg) { Write-Host "[reset] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "[reset] $msg" -ForegroundColor Green }
@@ -72,11 +80,13 @@ if ($dirty) {
 
 Invoke-Git fetch --tags --prune $Remote | Out-Null
 
-foreach ($tag in @($BaselineMain, $BaselineBuggy)) {
-    $code = Invoke-GitQuiet rev-parse --verify "refs/tags/$tag"
-    if ($code -ne 0) {
-        throw "Required tag '$tag' not found locally. Run 'git fetch --tags' or recreate the baseline."
-    }
+$code = Invoke-GitQuiet rev-parse --verify "refs/tags/$BaselineMain"
+if ($code -ne 0) {
+    throw "Required tag '$BaselineMain' not found locally. Run 'git fetch --tags' or recreate the baseline."
+}
+
+if (-not (Test-Path (Join-Path $RepoRoot $BuggyTemplate))) {
+    throw "Buggy file template '$BuggyTemplate' not found. The reset cannot replay the bug without it."
 }
 
 Write-Step "Closing open demo PRs (if any)..."
@@ -127,8 +137,20 @@ Invoke-Git checkout main | Out-Null
 Invoke-Git reset --hard "refs/tags/$BaselineMain" | Out-Null
 Invoke-Git push --force-with-lease $Remote main | Out-Null
 
-Write-Step "Recreating local $FeatBranch from $BaselineBuggy..."
-Invoke-Git branch -f $FeatBranch "refs/tags/$BaselineBuggy" | Out-Null
+Write-Step "Rebuilding $FeatBranch on top of main with a fresh-SHA buggy commit..."
+# Branch off the just-reset main so the previous buggy SHA (now an ancestor of
+# main after the prior demo merge) is no longer the tip. Without this step,
+# feat ends up 0 ahead / N behind main and GitHub refuses to open a PR.
+Invoke-Git checkout -B $FeatBranch main | Out-Null
+Copy-Item -Force `
+    -LiteralPath (Join-Path $RepoRoot $BuggyTemplate) `
+    -Destination (Join-Path $RepoRoot $BuggyTarget)
+Invoke-Git add $BuggyTarget | Out-Null
+Invoke-Git commit -m $BuggyCommitMsg | Out-Null
+
+Write-Step "Force-moving tag $BaselineBuggy to the new buggy commit..."
+Invoke-Git tag -f $BaselineBuggy | Out-Null
+Invoke-Git checkout main | Out-Null
 
 $mainSha = (Invoke-Git rev-parse --short main).ToString().Trim()
 $featSha = (Invoke-Git rev-parse --short $FeatBranch).ToString().Trim()
@@ -140,4 +162,5 @@ Write-Ok "  $FeatBranch  -> $featSha"
 Write-Ok ""
 Write-Ok "Next demo run:"
 Write-Ok "  git push -u origin $FeatBranch"
+Write-Ok "  git push --force origin refs/tags/$BaselineBuggy   # optional, keeps remote tag in sync"
 Write-Ok "  Then open the PR on GitHub and follow DEMO.md."
