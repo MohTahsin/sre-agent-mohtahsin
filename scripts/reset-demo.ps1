@@ -85,9 +85,11 @@ if ($code -ne 0) {
     throw "Required tag '$BaselineMain' not found locally. Run 'git fetch --tags' or recreate the baseline."
 }
 
-if (-not (Test-Path (Join-Path $RepoRoot $BuggyTemplate))) {
-    throw "Buggy file template '$BuggyTemplate' not found. The reset cannot replay the bug without it."
-}
+# NOTE: We intentionally do NOT validate the template here. The template lives
+# in the repo and is going to be wiped from the working tree by the
+# 'git reset --hard $BaselineMain' below if the tag points at a commit before
+# the template was added. We re-check after the main reset, where the answer
+# actually matters, and we guard against publishing a half-broken main.
 
 Write-Step "Closing open demo PRs (if any)..."
 $ghAvailable = (Get-Command gh -ErrorAction SilentlyContinue) -ne $null
@@ -132,10 +134,23 @@ if ($remoteDocsRefs) {
     }
 }
 
-Write-Step "Resetting local main to $BaselineMain and force-pushing..."
+Write-Step "Resetting local main to $BaselineMain (push deferred until rebuild succeeds)..."
 Invoke-Git checkout main | Out-Null
 Invoke-Git reset --hard "refs/tags/$BaselineMain" | Out-Null
-Invoke-Git push --force-with-lease $Remote main | Out-Null
+
+# The template must exist on the just-reset main; otherwise demo-baseline-main
+# points at a commit older than the template and the rebuild below would
+# crash on Copy-Item. Bail out BEFORE we push main so a botched reset never
+# publishes anything.
+if (-not (Test-Path (Join-Path $RepoRoot $BuggyTemplate))) {
+    throw @"
+'$BaselineMain' does not contain '$BuggyTemplate'.
+Re-tag '$BaselineMain' on a commit that includes the template (see DEMO.md):
+    git tag -f $BaselineMain <commit-with-template>
+    git push --force origin refs/tags/$BaselineMain
+Aborting before any remote state is touched.
+"@
+}
 
 Write-Step "Rebuilding $FeatBranch on top of main with a fresh-SHA buggy commit..."
 # Branch off the just-reset main so the previous buggy SHA (now an ancestor of
@@ -151,6 +166,9 @@ Invoke-Git commit -m $BuggyCommitMsg | Out-Null
 Write-Step "Force-moving tag $BaselineBuggy to the new buggy commit..."
 Invoke-Git tag -f $BaselineBuggy | Out-Null
 Invoke-Git checkout main | Out-Null
+
+Write-Step "Force-pushing main now that the rebuild succeeded..."
+Invoke-Git push --force-with-lease $Remote main | Out-Null
 
 $mainSha = (Invoke-Git rev-parse --short main).ToString().Trim()
 $featSha = (Invoke-Git rev-parse --short $FeatBranch).ToString().Trim()
