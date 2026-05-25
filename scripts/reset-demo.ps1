@@ -35,8 +35,8 @@ function Write-Warn($msg) { Write-Host "[reset] $msg" -ForegroundColor Yellow }
 
 # Wraps git so PowerShell 5.1 does not raise NativeCommandError when git writes
 # informational messages (e.g. "[deleted] foo") to stderr. Throws on non-zero exit.
+# No [CmdletBinding()] so short flags like -D are not consumed by -Debug.
 function Invoke-Git {
-    [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $GitArgs)
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
@@ -52,7 +52,6 @@ function Invoke-Git {
 # Same as Invoke-Git but never throws; returns the exit code so the caller can
 # treat "not found" / "already absent" cases as no-ops.
 function Invoke-GitQuiet {
-    [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $GitArgs)
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
@@ -129,8 +128,7 @@ Invoke-Git reset --hard "refs/tags/$BaselineMain" | Out-Null
 Invoke-Git push --force-with-lease $Remote main | Out-Null
 
 Write-Step "Recreating local $FeatBranch from $BaselineBuggy..."
-[void](Invoke-GitQuiet branch -D $FeatBranch)
-Invoke-Git branch $FeatBranch "refs/tags/$BaselineBuggy" | Out-Null
+Invoke-Git branch -f $FeatBranch "refs/tags/$BaselineBuggy" | Out-Null
 
 $mainSha = (Invoke-Git rev-parse --short main).ToString().Trim()
 $featSha = (Invoke-Git rev-parse --short $FeatBranch).ToString().Trim()
