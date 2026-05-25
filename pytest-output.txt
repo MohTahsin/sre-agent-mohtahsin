@@ -1,0 +1,170 @@
+FFFFFFFFFFF                                                              [100%]
+=================================== FAILURES ===================================
+_____________________________ test_returns_integer _____________________________
+
+    def test_returns_integer():
+        result = calculate_reserved_concurrency(current_throttles=5, avg_rps=40.0)
+>       assert isinstance(result, int), "Reserved concurrency must be an integer (AWS API requirement)"
+E       AssertionError: Reserved concurrency must be an integer (AWS API requirement)
+E       assert False
+E        +  where False = isinstance(20.0, int)
+
+tests/test_lambda_scaling.py:12: AssertionError
+_________________ test_enforces_minimum_floor_for_low_traffic __________________
+
+    def test_enforces_minimum_floor_for_low_traffic():
+        result = calculate_reserved_concurrency(current_throttles=0, avg_rps=1.0)
+>       assert result >= MIN_RESERVED_CONCURRENCY, (
+            f"Reserved concurrency must never drop below {MIN_RESERVED_CONCURRENCY} "
+            "to maintain a safety buffer for traffic spikes"
+        )
+E       AssertionError: Reserved concurrency must never drop below 10 to maintain a safety buffer for traffic spikes
+E       assert 0.5 >= 10
+
+tests/test_lambda_scaling.py:17: AssertionError
+_________________ test_enforces_minimum_floor_at_zero_traffic __________________
+
+    def test_enforces_minimum_floor_at_zero_traffic():
+        result = calculate_reserved_concurrency(current_throttles=0, avg_rps=0.0)
+>       assert result == MIN_RESERVED_CONCURRENCY
+E       assert 0.0 == 10
+
+tests/test_lambda_scaling.py:25: AssertionError
+________________ test_applies_safety_buffer_above_observed_rps _________________
+
+    def test_applies_safety_buffer_above_observed_rps():
+        avg_rps = 40.0
+        result = calculate_reserved_concurrency(current_throttles=12, avg_rps=avg_rps)
+>       assert result >= math.ceil(avg_rps * 1.25), (
+            "Recommendation must add a safety buffer over observed RPS, "
+            "otherwise the function will keep throttling at peak"
+        )
+E       AssertionError: Recommendation must add a safety buffer over observed RPS, otherwise the function will keep throttling at peak
+E       assert 20.0 >= 50
+E        +  where 50 = <built-in function ceil>((40.0 * 1.25))
+E        +    where <built-in function ceil> = math.ceil
+
+tests/test_lambda_scaling.py:31: AssertionError
+_________________ test_does_not_recommend_below_observed_load __________________
+
+    def test_does_not_recommend_below_observed_load():
+        avg_rps = 80.0
+        result = calculate_reserved_concurrency(current_throttles=20, avg_rps=avg_rps)
+>       assert result >= avg_rps, (
+            "Recommendation must never be below current average RPS — "
+            "doing so would guarantee continued throttling"
+        )
+E       AssertionError: Recommendation must never be below current average RPS — doing so would guarantee continued throttling
+E       assert 40.0 >= 80.0
+
+tests/test_lambda_scaling.py:40: AssertionError
+_______________ test_recommendation_for_realistic_loads[10.0-13] _______________
+
+avg_rps = 10.0, expected_min = 13
+
+    @pytest.mark.parametrize(
+        "avg_rps,expected_min",
+        [
+            (10.0, 13),    # 10 * 1.25 = 12.5 → ceil 13
+            (50.0, 63),    # 50 * 1.25 = 62.5 → ceil 63
+            (100.0, 125),  # 100 * 1.25 = 125
+            (250.0, 313),  # 250 * 1.25 = 312.5 → ceil 313
+        ],
+    )
+    def test_recommendation_for_realistic_loads(avg_rps, expected_min):
+        result = calculate_reserved_concurrency(current_throttles=10, avg_rps=avg_rps)
+>       assert result >= expected_min
+E       assert 5.0 >= 13
+
+tests/test_lambda_scaling.py:57: AssertionError
+_______________ test_recommendation_for_realistic_loads[50.0-63] _______________
+
+avg_rps = 50.0, expected_min = 63
+
+    @pytest.mark.parametrize(
+        "avg_rps,expected_min",
+        [
+            (10.0, 13),    # 10 * 1.25 = 12.5 → ceil 13
+            (50.0, 63),    # 50 * 1.25 = 62.5 → ceil 63
+            (100.0, 125),  # 100 * 1.25 = 125
+            (250.0, 313),  # 250 * 1.25 = 312.5 → ceil 313
+        ],
+    )
+    def test_recommendation_for_realistic_loads(avg_rps, expected_min):
+        result = calculate_reserved_concurrency(current_throttles=10, avg_rps=avg_rps)
+>       assert result >= expected_min
+E       assert 25.0 >= 63
+
+tests/test_lambda_scaling.py:57: AssertionError
+______________ test_recommendation_for_realistic_loads[100.0-125] ______________
+
+avg_rps = 100.0, expected_min = 125
+
+    @pytest.mark.parametrize(
+        "avg_rps,expected_min",
+        [
+            (10.0, 13),    # 10 * 1.25 = 12.5 → ceil 13
+            (50.0, 63),    # 50 * 1.25 = 62.5 → ceil 63
+            (100.0, 125),  # 100 * 1.25 = 125
+            (250.0, 313),  # 250 * 1.25 = 312.5 → ceil 313
+        ],
+    )
+    def test_recommendation_for_realistic_loads(avg_rps, expected_min):
+        result = calculate_reserved_concurrency(current_throttles=10, avg_rps=avg_rps)
+>       assert result >= expected_min
+E       assert 50.0 >= 125
+
+tests/test_lambda_scaling.py:57: AssertionError
+______________ test_recommendation_for_realistic_loads[250.0-313] ______________
+
+avg_rps = 250.0, expected_min = 313
+
+    @pytest.mark.parametrize(
+        "avg_rps,expected_min",
+        [
+            (10.0, 13),    # 10 * 1.25 = 12.5 → ceil 13
+            (50.0, 63),    # 50 * 1.25 = 62.5 → ceil 63
+            (100.0, 125),  # 100 * 1.25 = 125
+            (250.0, 313),  # 250 * 1.25 = 312.5 → ceil 313
+        ],
+    )
+    def test_recommendation_for_realistic_loads(avg_rps, expected_min):
+        result = calculate_reserved_concurrency(current_throttles=10, avg_rps=avg_rps)
+>       assert result >= expected_min
+E       assert 125.0 >= 313
+
+tests/test_lambda_scaling.py:57: AssertionError
+__________________________ test_rejects_negative_rps ___________________________
+
+    def test_rejects_negative_rps():
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lambda_scaling.py:61: Failed
+_______________________ test_rejects_negative_throttles ________________________
+
+    def test_rejects_negative_throttles():
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_lambda_scaling.py:66: Failed
+=========================== short test summary info ============================
+FAILED tests/test_lambda_scaling.py::test_returns_integer - AssertionError: Reserved concurrency must be an integer (AWS API requirement)
+assert False
+ +  where False = isinstance(20.0, int)
+FAILED tests/test_lambda_scaling.py::test_enforces_minimum_floor_for_low_traffic - AssertionError: Reserved concurrency must never drop below 10 to maintain a safety buffer for traffic spikes
+assert 0.5 >= 10
+FAILED tests/test_lambda_scaling.py::test_enforces_minimum_floor_at_zero_traffic - assert 0.0 == 10
+FAILED tests/test_lambda_scaling.py::test_applies_safety_buffer_above_observed_rps - AssertionError: Recommendation must add a safety buffer over observed RPS, otherwise the function will keep throttling at peak
+assert 20.0 >= 50
+ +  where 50 = <built-in function ceil>((40.0 * 1.25))
+ +    where <built-in function ceil> = math.ceil
+FAILED tests/test_lambda_scaling.py::test_does_not_recommend_below_observed_load - AssertionError: Recommendation must never be below current average RPS — doing so would guarantee continued throttling
+assert 40.0 >= 80.0
+FAILED tests/test_lambda_scaling.py::test_recommendation_for_realistic_loads[10.0-13] - assert 5.0 >= 13
+FAILED tests/test_lambda_scaling.py::test_recommendation_for_realistic_loads[50.0-63] - assert 25.0 >= 63
+FAILED tests/test_lambda_scaling.py::test_recommendation_for_realistic_loads[100.0-125] - assert 50.0 >= 125
+FAILED tests/test_lambda_scaling.py::test_recommendation_for_realistic_loads[250.0-313] - assert 125.0 >= 313
+FAILED tests/test_lambda_scaling.py::test_rejects_negative_rps - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_lambda_scaling.py::test_rejects_negative_throttles - Failed: DID NOT RAISE <class 'ValueError'>
+11 failed in 0.05s
