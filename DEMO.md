@@ -191,24 +191,33 @@ Sound bite: *"This is why Factory is more than a coding assistant. It is partici
 
 ## Resetting between runs
 
-```bash
-# 1. Close (do not merge) the demo PR on GitHub, or revert the merge commit.
-# 2. Delete remote branches:
-git push origin --delete feat/lambda-scaling-recommendation
-git push origin --delete docs/factory-update-<timestamp>
+The repo has two annotated tags pointing at the pristine baselines:
 
-# 3. Re-stage the buggy branch locally:
-git checkout main
-git pull
-git checkout -b feat/lambda-scaling-recommendation
-# Replace backend/remediation/lambda_scaling.py with the buggy version, then:
-git add backend/remediation/lambda_scaling.py
-git commit -m "feat: add reserved concurrency recommendation"
-git push -u origin feat/lambda-scaling-recommendation
-git checkout main
+- `demo-baseline-main` — the fixed-code state of `main`
+- `demo-baseline-buggy` — the buggy commit on top of that baseline
+
+Use the reset script (PowerShell) from the repo root:
+
+```powershell
+.\scripts\reset-demo.ps1
 ```
 
-Tip: keep a copy of the buggy file at `scripts/.demo-buggy-lambda-scaling.py.txt` so resets are fast.
+What it does:
+
+1. Closes any open demo PRs (requires `gh`; warns if missing).
+2. Deletes the remote `feat/lambda-scaling-recommendation` branch and any leftover `docs/factory-update-*` branches.
+3. Hard-resets local `main` to `demo-baseline-main` and force-pushes (`--force-with-lease`).
+4. Recreates the local `feat/lambda-scaling-recommendation` branch from `demo-baseline-buggy`.
+5. Leaves the buggy branch unpushed so you can push it live during the next demo.
+
+Then for the next run:
+
+```powershell
+git push -u origin feat/lambda-scaling-recommendation
+# open the PR on GitHub
+```
+
+The script refuses to run with uncommitted changes. If you ever need to recreate the tags from scratch, point them at the relevant commits and `git push origin demo-baseline-main demo-baseline-buggy`.
 
 ---
 
