@@ -21,9 +21,10 @@ Operational playbooks executed by the Grok SRE Agent during P1 incident response
 
 `calculate_reserved_concurrency` enforces:
 
-- Integer return value (AWS API requires integer concurrency values).
+- Integer return value (AWS API requires integer concurrency values; the result is coerced via `math.ceil`).
 - A minimum floor of `10` so that traffic spikes never drop the function below a baseline buffer.
 - A `1.25` safety multiplier over observed average RPS to absorb traffic variance.
+- Input validation: a negative `avg_rps` or `current_throttles` raises `ValueError` so the agent never acts on a malformed metric reading.
 
 These rules ensure the agent never recommends a value below current production load, and never recommends a sub-baseline value during low-traffic windows.
 
