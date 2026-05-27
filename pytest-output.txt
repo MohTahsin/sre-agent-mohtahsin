@@ -167,4 +167,4 @@ FAILED tests/test_lambda_scaling.py::test_recommendation_for_realistic_loads[100
 FAILED tests/test_lambda_scaling.py::test_recommendation_for_realistic_loads[250.0-313] - assert 125.0 >= 313
 FAILED tests/test_lambda_scaling.py::test_rejects_negative_rps - Failed: DID NOT RAISE <class 'ValueError'>
 FAILED tests/test_lambda_scaling.py::test_rejects_negative_throttles - Failed: DID NOT RAISE <class 'ValueError'>
-11 failed in 0.05s
+11 failed in 0.06s
