@@ -19,7 +19,7 @@ The agent uses `backend.remediation.lambda_scaling.calculate_reserved_concurrenc
 from backend.remediation.lambda_scaling import calculate_reserved_concurrency
 
 calculate_reserved_concurrency(current_throttles=120, avg_rps=40.0)
-# -> 50  (max(10, ceil(40 * 1.25)))
+# -> 50  (max(ceil(40 * 1.25), 10))
 ```
 
 ### Why a 1.25 safety buffer?
