@@ -30,6 +30,10 @@ Production traffic rarely sits exactly at its average RPS — short bursts to ~1
 
 A floor of 10 guarantees the function can absorb a small traffic spike even during very low-traffic windows. AWS also requires an account-level minimum of 10 unreserved executions, so a floor of 10 reserves a sane baseline without exhausting the account quota.
 
+### Input validation
+
+The recommendation is only meaningful for non-negative inputs. A negative `avg_rps` or `current_throttles` raises `ValueError` instead of returning a value, so malformed metric data fails fast rather than silently producing a bad ceiling.
+
 ## Account-level safety
 
 `increase_lambda_concurrency` queries `lambda.get_account_settings()` and caps the recommendation at `current_reserved + unreserved - 10` so it never drives unreserved executions below the AWS-enforced floor of 10. If the cap kicks in, the response includes `cappedByAccountQuota: true`.
