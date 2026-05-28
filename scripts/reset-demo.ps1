@@ -78,7 +78,7 @@ if ($dirty) {
     throw "Working tree is not clean. Commit or stash changes before resetting:`n$dirty"
 }
 
-Invoke-Git fetch --tags --prune $Remote | Out-Null
+Invoke-Git fetch --tags --prune --force $Remote | Out-Null
 
 $code = Invoke-GitQuiet rev-parse --verify "refs/tags/$BaselineMain"
 if ($code -ne 0) {
@@ -165,6 +165,7 @@ Invoke-Git commit -m $BuggyCommitMsg | Out-Null
 
 Write-Step "Force-moving tag $BaselineBuggy to the new buggy commit..."
 Invoke-Git tag -f $BaselineBuggy | Out-Null
+Invoke-Git push --force $Remote "refs/tags/$BaselineBuggy" | Out-Null
 Invoke-Git checkout main | Out-Null
 
 Write-Step "Force-pushing main now that the rebuild succeeded..."
@@ -180,5 +181,4 @@ Write-Ok "  $FeatBranch  -> $featSha"
 Write-Ok ""
 Write-Ok "Next demo run:"
 Write-Ok "  git push -u origin $FeatBranch"
-Write-Ok "  git push --force origin refs/tags/$BaselineBuggy   # optional, keeps remote tag in sync"
 Write-Ok "  Then open the PR on GitHub and follow DEMO.md."

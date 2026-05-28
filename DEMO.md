@@ -217,6 +217,8 @@ git push -u origin feat/lambda-scaling-recommendation
 # open the PR on GitHub
 ```
 
+The reset script keeps `demo-baseline-buggy` in sync with origin automatically; no manual tag push is required.
+
 The script refuses to run with uncommitted changes. If you ever need to recreate the tags from scratch, point them at the relevant commits and `git push origin demo-baseline-main demo-baseline-buggy`.
 
 ---
