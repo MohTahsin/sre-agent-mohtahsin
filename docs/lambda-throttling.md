@@ -19,16 +19,16 @@ The agent uses `backend.remediation.lambda_scaling.calculate_reserved_concurrenc
 from backend.remediation.lambda_scaling import calculate_reserved_concurrency
 
 calculate_reserved_concurrency(current_throttles=120, avg_rps=40.0)
-# -> 50  (max(10, ceil(40 * 1.25)))
+# -> 44  (max(5, ceil(40 * 1.10)))
 ```
 
-### Why a 1.25 safety buffer?
+### Why a 1.10 safety buffer?
 
-Production traffic rarely sits exactly at its average RPS — short bursts to ~1.2x average are normal. Sizing the ceiling to `ceil(avg_rps * 1.25)` keeps headroom for those bursts without provisioning for worst-case peak.
+Production traffic rarely sits exactly at its average RPS — short bursts to ~1.1x average are normal. Sizing the ceiling to `ceil(avg_rps * 1.10)` keeps headroom for those bursts without provisioning for worst-case peak.
 
-### Why a floor of 10?
+### Why a floor of 5?
 
-A floor of 10 guarantees the function can absorb a small traffic spike even during very low-traffic windows. AWS also requires an account-level minimum of 10 unreserved executions, so a floor of 10 reserves a sane baseline without exhausting the account quota.
+A floor of 5 guarantees the function can absorb a small traffic spike even during very low-traffic windows, reserving a sane baseline without provisioning idle capacity.
 
 ## Account-level safety
 

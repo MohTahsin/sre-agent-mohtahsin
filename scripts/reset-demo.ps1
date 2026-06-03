@@ -10,10 +10,11 @@
       4. Hard-resets local main to the demo-baseline-main tag and force-pushes.
       5. Rebuilds local feat/lambda-scaling-recommendation on top of main with a
          FRESH-SHA buggy commit replayed from
-         scripts/.demo-buggy-lambda-scaling.py.txt, then force-moves the
-         demo-baseline-buggy tag to the new commit. This is what keeps the
-         feat branch ahead of main on every cycle so GitHub will let you open
-         a PR in step 2 of DEMO.md.
+         scripts/.demo-buggy-lambda-scaling.py.txt (buggy implementation) and
+         scripts/.demo-new-tests-lambda-scaling.py.txt (the raised 1.25/floor-10
+         contract tests), then force-moves the demo-baseline-buggy tag to the new
+         commit. This is what keeps the feat branch ahead of main on every cycle
+         so GitHub will let you open a PR in step 2 of DEMO.md.
 
     Does NOT push the buggy feat branch. You push it live during the next demo
     as step 1 of the kickoff so the "watch CI fail" moment stays real.
@@ -35,7 +36,9 @@ $FeatBranch = "feat/lambda-scaling-recommendation"
 $Remote = "origin"
 $BuggyTemplate = "scripts/.demo-buggy-lambda-scaling.py.txt"
 $BuggyTarget = "backend/remediation/lambda_scaling.py"
-$BuggyCommitMsg = "feat: add reserved concurrency recommendation"
+$NewTestsTemplate = "scripts/.demo-new-tests-lambda-scaling.py.txt"
+$NewTestsTarget = "tests/test_lambda_scaling.py"
+$BuggyCommitMsg = "feat: raise reserved-concurrency safety buffer to 1.25 and floor to 10"
 
 function Write-Step($msg) { Write-Host "[reset] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "[reset] $msg" -ForegroundColor Green }
@@ -152,6 +155,16 @@ Aborting before any remote state is touched.
 "@
 }
 
+if (-not (Test-Path (Join-Path $RepoRoot $NewTestsTemplate))) {
+    throw @"
+'$BaselineMain' does not contain '$NewTestsTemplate'.
+Re-tag '$BaselineMain' on a commit that includes the template (see DEMO.md):
+    git tag -f $BaselineMain <commit-with-template>
+    git push --force origin refs/tags/$BaselineMain
+Aborting before any remote state is touched.
+"@
+}
+
 Write-Step "Rebuilding $FeatBranch on top of main with a fresh-SHA buggy commit..."
 # Branch off the just-reset main so the previous buggy SHA (now an ancestor of
 # main after the prior demo merge) is no longer the tip. Without this step,
@@ -160,7 +173,10 @@ Invoke-Git checkout -B $FeatBranch main | Out-Null
 Copy-Item -Force `
     -LiteralPath (Join-Path $RepoRoot $BuggyTemplate) `
     -Destination (Join-Path $RepoRoot $BuggyTarget)
-Invoke-Git add $BuggyTarget | Out-Null
+Copy-Item -Force `
+    -LiteralPath (Join-Path $RepoRoot $NewTestsTemplate) `
+    -Destination (Join-Path $RepoRoot $NewTestsTarget)
+Invoke-Git add $BuggyTarget $NewTestsTarget | Out-Null
 Invoke-Git commit -m $BuggyCommitMsg | Out-Null
 
 Write-Step "Force-moving tag $BaselineBuggy to the new buggy commit..."

@@ -4,8 +4,8 @@ Reserved concurrency recommendation for AWS Lambda throttling remediation.
 
 import math
 
-MIN_RESERVED_CONCURRENCY = 10
-SAFETY_BUFFER_MULTIPLIER = 1.25
+MIN_RESERVED_CONCURRENCY = 5
+SAFETY_BUFFER_MULTIPLIER = 1.10
 
 
 def calculate_reserved_concurrency(current_throttles, avg_rps):

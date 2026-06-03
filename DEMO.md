@@ -104,24 +104,37 @@ Show the diagram in this file. State the thesis. Emphasise that the workflows ar
 
 ### Step 1 — Show the bug (~1m)
 
+The PR raises the safety buffer from `1.10` to `1.25` and the floor from `5` to
+`10`. It updates `tests/test_lambda_scaling.py` to the new contract, but the
+implementation has a realistic mistake.
+
 Open `backend/remediation/lambda_scaling.py` on the `feat/lambda-scaling-recommendation` branch:
 
 ```python
+SAFETY_BUFFER_MULTIPLIER = 1.25
+
+
 def calculate_reserved_concurrency(current_throttles, avg_rps):
-    return avg_rps * 0.5
+    """Recommend a reserved concurrency ceiling using a 1.25 safety buffer
+    over observed average RPS, with a minimum floor of 10."""
+    if avg_rps < 0:
+        raise ValueError("avg_rps must be non-negative")
+    if current_throttles < 0:
+        raise ValueError("current_throttles must be non-negative")
+
+    return avg_rps * SAFETY_BUFFER_MULTIPLIER
 ```
 
-Call out the issues:
-- Returns a `float`; AWS API rejects floats.
-- Underestimates by 50% — guarantees continued throttling.
-- No minimum safety floor.
-- Will recommend below current production load.
+Call out the issues — the kind that slip through code review:
+- Returns a `float`; AWS API rejects floats (no `math.ceil`).
+- The docstring promises a floor of 10, but the code never enforces it via `max(...)`.
+- Low-traffic windows therefore get under-provisioned below the documented baseline.
 
 ### Step 2 — Open PR (~30s)
 
 On GitHub, open a PR from `feat/lambda-scaling-recommendation` -> `main` titled:
 
-> `feat: add reserved concurrency recommendation`
+> `feat: raise reserved-concurrency safety buffer to 1.25 and floor to 10`
 
 Mention this looks like a normal developer PR — no Factory-specific custom UI.
 
@@ -130,8 +143,8 @@ Mention this looks like a normal developer PR — no Factory-specific custom UI.
 The `CI` workflow runs `pytest`. Tests in `tests/test_lambda_scaling.py` fail:
 
 - `test_returns_integer` — float vs int.
-- `test_enforces_minimum_floor_for_low_traffic` — returns < 10.
-- `test_does_not_recommend_below_observed_load` — returns 0.5 * avg_rps.
+- `test_enforces_minimum_floor_for_low_traffic` / `..._at_zero_traffic` — returns below the new floor of 10.
+- `test_recommendation_for_realistic_loads` — float results land just under the `ceil` expectations.
 
 Sound bite: *"CI is the first line of defence. It caught the bug before merge."*
 
@@ -171,6 +184,16 @@ The `Auto-Update Documentation` workflow triggers on `push` to `main` for `backe
 1. Diffs the merge commit.
 2. Asks Droid to update `README.md` and `docs/` to reflect the new remediation logic.
 3. Creates a new branch `docs/factory-update-<timestamp>`, commits, pushes, and opens a PR with the `documentation` and `automated` labels.
+
+The merged code now uses a `1.25` buffer and a floor of `10`, but the docs still
+describe the old `1.10` / floor-`5` behaviour, so Droid makes concrete edits:
+
+- `docs/lambda-throttling.md`: the worked example changes from `44` to `50`, and
+  the "Why a 1.10 safety buffer?" / "Why a floor of 5?" rationale updates to `1.25` / `10`.
+- `docs/remediation-playbooks.md`: the recommendation-logic bullets update the
+  multiplier and floor.
+
+This is the payoff: the docs PR is a real, reviewable behaviour-change diff — not a no-op.
 
 Open the new docs PR. Show that examples and operational guidance now match the merged code.
 
@@ -239,8 +262,10 @@ The script refuses to run with uncommitted changes. If you ever need to recreate
 
 | File | Purpose |
 |------|---------|
-| `backend/remediation/lambda_scaling.py` | The function under demo (fixed on `main`) |
-| `tests/test_lambda_scaling.py` | Pytest assertions that fail against the buggy branch |
+| `backend/remediation/lambda_scaling.py` | The function under demo (older 1.10/floor-5 baseline on `main`) |
+| `tests/test_lambda_scaling.py` | Pytest assertions (raised to the 1.25/floor-10 contract on the feat branch) |
+| `scripts/.demo-buggy-lambda-scaling.py.txt` | Buggy implementation replayed onto the feat branch by the reset script |
+| `scripts/.demo-new-tests-lambda-scaling.py.txt` | The raised 1.25/floor-10 contract tests replayed onto the feat branch |
 | `.github/workflows/ci.yml` | Runs pytest on every PR |
 | `.github/workflows/droid-review.yml` | Factory automated PR review (deep mode + auto-approve) |
 | `.github/workflows/droid-fix-bug.yml` | Label-triggered Droid Exec fix |
