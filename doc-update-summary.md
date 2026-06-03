@@ -1,0 +1,8 @@
+# Documentation Update Summary
+
+- **What changed in code:** The merge re-tuned `backend.remediation.lambda_scaling.calculate_reserved_concurrency` to a `1.10` safety buffer (`SAFETY_BUFFER_MULTIPLIER = 1.10`) over observed average RPS, with a `MIN_RESERVED_CONCURRENCY` floor of `5`. The result is coerced to an integer via `math.ceil` and clamped with `max(...)`, so a low-traffic call like `calculate_reserved_concurrency(120, 40.0)` returns `44 = max(5, ceil(40 * 1.10))`.
+- **`docs/lambda-throttling.md`:** Verified consistent — the worked example (`-> 44 (max(5, ceil(40 * 1.10)))`) and the "Why a 1.10 safety buffer?" / "Why a floor of 5?" rationale already match the merged behaviour, so no edits were required.
+- **`docs/remediation-playbooks.md`:** Verified consistent — the recommendation-logic bullets (integer return value, minimum floor of `5`, `1.10` safety multiplier) already describe the merged code, so no edits were required.
+- **`README.md`:** No change needed. It does not reference `calculate_reserved_concurrency`; its `10 -> 20` figures describe the separate `increase_lambda_concurrency` demo scenario, which this change does not affect.
+- **Why no behaviour edits:** The same merge updated implementation, tests, and the affected docs in lockstep to the `1.10` / floor-`5` baseline, so the documentation already reflects the code. Per the "only modify documentation that is actually affected" guidance, the existing docs were left unchanged after verification.
+- **Verification:** The full `pytest` suite (11 tests in `tests/test_lambda_scaling.py`) passes, and direct calls confirm integer returns, the floor of `5` at zero/low traffic, and `ceil(avg_rps * 1.10)` above the floor — all matching the documented examples.
