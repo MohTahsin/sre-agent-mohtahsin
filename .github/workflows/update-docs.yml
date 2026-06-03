@@ -36,7 +36,7 @@ jobs:
         env:
           FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
         run: |
-          droid exec --auto high "
+          droid exec --auto high -m claude-haiku-4-5-20251001 "
           The following source files were just merged to main:
           $(cat changed_files.txt)
 

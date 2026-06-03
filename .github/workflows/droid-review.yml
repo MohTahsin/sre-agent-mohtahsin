@@ -32,7 +32,7 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          droid exec --auto high "
+          droid exec --auto high -m claude-haiku-4-5-20251001 "
           You are performing an automated code review on pull request #${PR_NUMBER}
           for the grok-sre-agent repository.
 
