@@ -262,8 +262,8 @@ The script refuses to run with uncommitted changes. If you ever need to recreate
 
 | File | Purpose |
 |------|---------|
-| `backend/remediation/lambda_scaling.py` | The function under demo (older 1.10/floor-5 baseline on `main`) |
-| `tests/test_lambda_scaling.py` | Pytest assertions (raised to the 1.25/floor-10 contract on the feat branch) |
+| `backend/remediation/lambda_scaling.py` | The function under demo (1.25/floor-10 safety buffer and minimum, merged to `main`) |
+| `tests/test_lambda_scaling.py` | Pytest assertions (1.25/floor-10 contract, merged to `main`) |
 | `scripts/.demo-buggy-lambda-scaling.py.txt` | Buggy implementation replayed onto the feat branch by the reset script |
 | `scripts/.demo-new-tests-lambda-scaling.py.txt` | The raised 1.25/floor-10 contract tests replayed onto the feat branch |
 | `.github/workflows/ci.yml` | Runs pytest on every PR |

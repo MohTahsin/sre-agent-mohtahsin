@@ -22,8 +22,8 @@ remediations.
 `calculate_reserved_concurrency(current_throttles, avg_rps)` in
 `backend/remediation/lambda_scaling.py` must:
 - Return an `int` (AWS reserved-concurrency API requires an integer).
-- Never recommend below the documented minimum floor (`MIN_RESERVED_CONCURRENCY`).
-- Apply the documented safety buffer (`SAFETY_BUFFER_MULTIPLIER`) over the
+- Never recommend below the documented minimum floor (`MIN_RESERVED_CONCURRENCY` = 10).
+- Apply the documented safety buffer (`SAFETY_BUFFER_MULTIPLIER` = 1.25) over the
   observed average RPS.
 - Never recommend a value below current observed load (that would guarantee
   continued throttling).
