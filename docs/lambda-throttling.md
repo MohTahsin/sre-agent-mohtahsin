@@ -22,6 +22,8 @@ calculate_reserved_concurrency(current_throttles=120, avg_rps=40.0)
 # -> 50  (max(10, ceil(40 * 1.25)))
 ```
 
+The return value is always an `int` (the buffered RPS is rounded up with `math.ceil`), as required by the AWS concurrency API. A negative `avg_rps` or `current_throttles` raises `ValueError` rather than producing a nonsensical ceiling.
+
 ### Why a 1.25 safety buffer?
 
 Production traffic rarely sits exactly at its average RPS — short bursts to ~1.2x average are normal. Sizing the ceiling to `ceil(avg_rps * 1.25)` keeps headroom for those bursts without provisioning for worst-case peak.
