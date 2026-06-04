@@ -1,2 +1,6 @@
 backend/remediation/lambda_scaling.py
+changed_files.txt
+doc-update-summary.md
+docs/lambda-throttling.md
+docs/remediation-playbooks.md
 tests/test_lambda_scaling.py
