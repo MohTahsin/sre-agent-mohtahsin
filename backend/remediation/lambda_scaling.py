@@ -2,8 +2,13 @@
 Reserved concurrency recommendation for AWS Lambda throttling remediation.
 """
 
+import math
+
 # Raise the safety buffer over observed RPS from 1.10 to 1.25.
 SAFETY_BUFFER_MULTIPLIER = 1.25
+
+# Minimum floor for reserved concurrency to maintain a safety buffer.
+MIN_RESERVED_CONCURRENCY = 10
 
 
 def calculate_reserved_concurrency(current_throttles, avg_rps):
@@ -14,4 +19,8 @@ def calculate_reserved_concurrency(current_throttles, avg_rps):
     if current_throttles < 0:
         raise ValueError("current_throttles must be non-negative")
 
-    return avg_rps * SAFETY_BUFFER_MULTIPLIER
+    # Apply the safety buffer over observed RPS and round up to the nearest integer
+    recommendation = math.ceil(avg_rps * SAFETY_BUFFER_MULTIPLIER)
+    
+    # Enforce minimum floor
+    return max(recommendation, MIN_RESERVED_CONCURRENCY)
