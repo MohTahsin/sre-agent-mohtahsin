@@ -22,8 +22,8 @@ Operational playbooks executed by the Grok SRE Agent during P1 incident response
 `calculate_reserved_concurrency` enforces:
 
 - Integer return value (AWS API requires integer concurrency values).
-- A minimum floor of `5` so that traffic spikes never drop the function below a baseline buffer.
-- A `1.10` safety multiplier over observed average RPS to absorb traffic variance.
+- A minimum floor of `10` so that traffic spikes never drop the function below a robust safety buffer.
+- A `1.25` safety multiplier over observed average RPS to absorb traffic variance and transient spikes.
 
 These rules ensure the agent never recommends a value below current production load, and never recommends a sub-baseline value during low-traffic windows.
 
