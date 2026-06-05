@@ -4,7 +4,7 @@ import pytest
 
 from backend.remediation.lambda_scaling import calculate_reserved_concurrency
 
-MIN_RESERVED_CONCURRENCY = 5
+MIN_RESERVED_CONCURRENCY = 10
 
 
 def test_returns_integer():
@@ -28,7 +28,7 @@ def test_enforces_minimum_floor_at_zero_traffic():
 def test_applies_safety_buffer_above_observed_rps():
     avg_rps = 40.0
     result = calculate_reserved_concurrency(current_throttles=12, avg_rps=avg_rps)
-    assert result >= math.ceil(avg_rps * 1.10), (
+    assert result >= math.ceil(avg_rps * 1.25), (
         "Recommendation must add a safety buffer over observed RPS, "
         "otherwise the function will keep throttling at peak"
     )
@@ -46,10 +46,10 @@ def test_does_not_recommend_below_observed_load():
 @pytest.mark.parametrize(
     "avg_rps,expected_min",
     [
-        (10.0, 11),    # 10 * 1.10 = 11.0 → ceil 11
-        (50.0, 55),    # 50 * 1.10 = 55.0 → ceil 55
-        (100.0, 110),  # 100 * 1.10 = 110
-        (250.0, 275),  # 250 * 1.10 = 275.0 → ceil 275
+        (10.0, 13),    # 10 * 1.25 = 12.5 → ceil 13
+        (50.0, 63),    # 50 * 1.25 = 62.5 → ceil 63
+        (100.0, 125),  # 100 * 1.25 = 125
+        (250.0, 313),  # 250 * 1.25 = 312.5 → ceil 313
     ],
 )
 def test_recommendation_for_realistic_loads(avg_rps, expected_min):
