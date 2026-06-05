@@ -19,16 +19,16 @@ The agent uses `backend.remediation.lambda_scaling.calculate_reserved_concurrenc
 from backend.remediation.lambda_scaling import calculate_reserved_concurrency
 
 calculate_reserved_concurrency(current_throttles=120, avg_rps=40.0)
-# -> 44  (max(5, ceil(40 * 1.10)))
+# -> 50  (max(10, ceil(40 * 1.25)))
 ```
 
-### Why a 1.10 safety buffer?
+### Why a 1.25 safety buffer?
 
-Production traffic rarely sits exactly at its average RPS — short bursts to ~1.1x average are normal. Sizing the ceiling to `ceil(avg_rps * 1.10)` keeps headroom for those bursts without provisioning for worst-case peak.
+Production traffic rarely sits exactly at its average RPS — bursts to ~1.25x average are common during peak hours. Sizing the ceiling to `ceil(avg_rps * 1.25)` maintains headroom for those bursts without provisioning for worst-case peak, improving resilience against traffic variance.
 
-### Why a floor of 5?
+### Why a floor of 10?
 
-A floor of 5 guarantees the function can absorb a small traffic spike even during very low-traffic windows, reserving a sane baseline without provisioning idle capacity.
+A floor of 10 guarantees the function can absorb meaningful traffic spikes even during very low-traffic windows, maintaining a robust safety baseline. This prevents the function from being under-provisioned during scaling-up scenarios or unexpected load surges.
 
 ## Account-level safety
 
